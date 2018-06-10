@@ -39,7 +39,7 @@ namespace {
 
     virtual wxFSFile *GetFile(const wxString &uri) {
       std::ostringstream os;
-      if ((*func)(uri.ToStdString(), os))
+      if (!(*func)(uri.ToStdString(), os))
         return nullptr;
 
       return new wxFSFile(new wxStringInputStream(os.str()), uri, "", "", wxDateTime::Now());
@@ -130,7 +130,7 @@ namespace {
     browser = wxWebView::New(this, wxID_ANY);
 
     wxSizer *sizer = new wxBoxSizer(wxVERTICAL);
-    browser->SetSizer(sizer);
+    sizer->Add(browser, wxSizerFlags().Expand().Proportion(1));
 
     browser->EnableContextMenu(false);
     browser->EnableHistory(false);
@@ -187,6 +187,9 @@ namespace {
 
       WVFrame *frame = new WVFrame(d->label);
       frame->Show();
+
+      // Don't let the window get too small.
+      frame->SetMinSize(wxSize(300, 300));
 
       // It might, on some systems, make more sense to choose a smaller size.
       // I'm not sure that makes sense on mobile platforms, however.
@@ -284,7 +287,7 @@ namespace {
     SetupIEFeatures();
 #endif
 
-    std::unqiue_lock<std::mutex> iul(WVInitMutex);
+    std::unique_lock<std::mutex> iul(WVInitMutex);
     WVInitDone = true;
     iul.unlock();
     WVInitCV.notify_one();
@@ -296,16 +299,22 @@ namespace {
     else
       wxEntry(hInstance);
 #else
+  wxInitializer wxinit;
+
+  std::unique_lock<std::mutex> iul(WVInitMutex);
+  WVInitDone = true;
+  iul.unlock();
+  WVInitCV.notify_one();
+
   int argc = 0;
   wxChar* argv = NULL;
 
   wxEntry(argc, &argv);
 #endif // __WINDOWS__
   }
-
 } // anonymous namespace
 
-namespace web_view_detail {
+namespace wv { namespace web_view_detail {
   struct WEB_VIEW_WX_EXPORT impl_wx : public impl {
     impl_wx(const std::string &title) {
       std::unique_lock<std::mutex> tul(WVThreadMutex);
@@ -314,7 +323,6 @@ namespace web_view_detail {
         WVThread.reset(new std::thread(WVThreadMain));
         WVInitCV.wait(iul, []{ return WVInitDone; } );
       }
-
       tul.unlock();
 
       NewWVData d;
@@ -378,5 +386,6 @@ namespace web_view_detail {
   WEB_VIEW_WX_EXPORT impl *make_web_view_impl(const std::string &title) {
     return new impl_wx(title);
   }
-}
+} }
+
 
