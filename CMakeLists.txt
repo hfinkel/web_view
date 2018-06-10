@@ -1,9 +1,13 @@
 # Author: Hal Finkel
 
+cmake_minimum_required(VERSION 3.10)
+
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 add_library(web_view_wx web_view_wx.cpp)
+target_include_directories(web_view_wx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(web_view_wx PUBLIC ${CMAKE_BINARY_DIR})
 
 find_package(wxWidgets REQUIRED net webview core base)
 include(${wxWidgets_USE_FILE})
@@ -19,7 +23,16 @@ endif()
 include(GenerateExportHeader)
 generate_export_header(web_view_wx)
 
-install(TARGETS web_view_wx DESTINATION ${LIBRARY_INSTALL_DIR})
+if(INCLUDE_INSTALL_DIR)
+else()
+set(INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/include)
+endif()
+if(LIB_INSTALL_DIR)
+else()
+set(LIB_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/lib)
+endif()
+
+install(TARGETS web_view_wx DESTINATION ${LIB_INSTALL_DIR})
 install(FILES
   web_view.h
   ${PROJECT_BINARY_DIR}/web_view_wx_export.h DESTINATION ${INCLUDE_INSTALL_DIR}
