@@ -28,6 +28,7 @@ namespace {
   using namespace web_view_detail;
 
   static const int CMD_DISPLAY_URI = wxNewId();
+  static const int CMD_RUN_SCRIPT = wxNewId();
   static const int CMD_REGISTER_SCHEME = wxNewId();
   static const int CMD_REGISTER_CLOSE = wxNewId();
   static const int CMD_NEW_WEB_VIEW = wxNewId();
@@ -66,6 +67,14 @@ namespace {
       prom.reset(p);
 
       browser->LoadURL(uri);
+    }
+
+    void RunScript(const std::string &script, std::promise<std::string> *p) {
+      wxString result;
+      if (!browser->RunScript(script, &result))
+        result = "";
+
+      p->set_value(result.ToStdString());
     }
 
     void OnNavigationRequest(wxWebViewEvent &evt) { }
@@ -184,12 +193,24 @@ namespace {
     std::string uri;
   };
 
+  struct RunScriptData {
+    std::promise<std::string> *prom;
+    WVFrame *frame;
+    std::string script;
+  };
+
   struct WVApp : public wxApp {
     WVApp();
 
     void OnDisplayURI(wxThreadEvent& event) {
       DisplayURIData *d = event.GetPayload<DisplayURIData *>();
       d->frame->DisplayHTMLFromURI(d->uri, d->prom);
+      delete d;
+    }
+
+    void OnRunScript(wxThreadEvent& event) {
+      RunScriptData *d = event.GetPayload<RunScriptData *>();
+      d->frame->RunScript(d->script, d->prom);
       delete d;
     }
 
@@ -234,6 +255,7 @@ namespace {
     SetExitOnFrameDelete(false);
 
     Bind(wxEVT_THREAD, &WVApp::OnDisplayURI, this, CMD_DISPLAY_URI);
+    Bind(wxEVT_THREAD, &WVApp::OnRunScript, this, CMD_RUN_SCRIPT);
     Bind(wxEVT_THREAD, &WVApp::OnRegisterScheme, this, CMD_REGISTER_SCHEME);
     Bind(wxEVT_THREAD, &WVApp::OnRegisterClose, this, CMD_REGISTER_CLOSE);
     Bind(wxEVT_THREAD, &WVApp::OnNewWebView, this, CMD_NEW_WEB_VIEW);
@@ -381,6 +403,21 @@ namespace wv { namespace web_view_detail {
       std::future<std::error_code> f = d->prom->get_future();
       wxThreadEvent *event =
         new wxThreadEvent(wxEVT_THREAD, CMD_DISPLAY_URI);
+      event->SetPayload(d);
+
+      wxQueueEvent(wxApp::GetInstance(), event);
+      return f;
+    }
+
+    virtual std::future<std::string> run_script(const std::string &script) override {
+      RunScriptData *d = new RunScriptData;
+      d->prom = new std::promise<std::string>;
+      d->frame = frame;
+      d->script = script;
+
+      std::future<std::string> f = d->prom->get_future();
+      wxThreadEvent *event =
+        new wxThreadEvent(wxEVT_THREAD, CMD_RUN_SCRIPT);
       event->SetPayload(d);
 
       wxQueueEvent(wxApp::GetInstance(), event);

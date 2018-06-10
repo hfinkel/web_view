@@ -42,6 +42,7 @@ namespace wv {
       virtual ~impl() { }
 
       virtual std::future<std::error_code> display_from_uri(const std::string &uri) = 0;
+      virtual std::future<std::string> run_script(const std::string &script) = 0;
       virtual void register_uri_scheme_handler(const std::string &scheme,
                                                HandlerFunc *func) = 0;
       virtual void register_close_handler(CloseHandlerFunc *func) = 0;
@@ -55,6 +56,10 @@ namespace wv {
 
     std::future<std::error_code> display_from_uri(const std::string &uri) {
       return m->display_from_uri(uri);
+    }
+
+    std::future<std::string> run_script(const std::string &script) {
+      return m->run_script(script);
     }
 
     template <typename URISchemeHandler>
