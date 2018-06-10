@@ -1,5 +1,7 @@
 # Author: Hal Finkel
 
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 add_library(web_view_wx web_view_wx.cpp)
 
