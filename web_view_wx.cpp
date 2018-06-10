@@ -29,6 +29,7 @@ namespace {
 
   static const int CMD_DISPLAY_URI = wxNewId();
   static const int CMD_REGISTER_SCHEME = wxNewId();
+  static const int CMD_REGISTER_CLOSE = wxNewId();
   static const int CMD_NEW_WEB_VIEW = wxNewId();
   static const int CMD_DEL_WEB_VIEW = wxNewId();
 
@@ -113,15 +114,26 @@ namespace {
       prom.release()->set_value(std::make_error_code(e));
     }
 
+    void RegisterClose(CloseHandlerFunc *f) {
+      cfunc.reset(f);
+    }
+
+    void OnClose(wxCloseEvent &event) {
+      if (cfunc)
+        (*cfunc)();
+    }
+
     wxDECLARE_EVENT_TABLE();
 
     wxWebView* browser;
     wxString base_label;
 
     std::unique_ptr<std::promise<std::error_code>> prom;
+    std::unique_ptr<CloseHandlerFunc> cfunc;
   };
 
   wxBEGIN_EVENT_TABLE(WVFrame, wxFrame)
+  EVT_CLOSE(WVFrame::OnClose)
   wxEND_EVENT_TABLE()
 
   WVFrame::WVFrame(const wxString &label)
@@ -161,6 +173,11 @@ namespace {
     HandlerFunc *func;
   };
 
+  struct RegCloseData {
+    WVFrame *frame;
+    CloseHandlerFunc *cfunc;
+  };
+
   struct DisplayURIData {
     std::promise<std::error_code> *prom;
     WVFrame *frame;
@@ -179,6 +196,12 @@ namespace {
     void OnRegisterScheme(wxThreadEvent& event) {
       RegSchemeData *d = event.GetPayload<RegSchemeData *>();
       d->frame->RegisterURIScheme(d->scheme, d->func);
+      delete d;
+    }
+
+    void OnRegisterClose(wxThreadEvent& event) {
+      RegCloseData *d = event.GetPayload<RegCloseData *>();
+      d->frame->RegisterClose(d->cfunc);
       delete d;
     }
 
@@ -212,6 +235,7 @@ namespace {
 
     Bind(wxEVT_THREAD, &WVApp::OnDisplayURI, this, CMD_DISPLAY_URI);
     Bind(wxEVT_THREAD, &WVApp::OnRegisterScheme, this, CMD_REGISTER_SCHEME);
+    Bind(wxEVT_THREAD, &WVApp::OnRegisterClose, this, CMD_REGISTER_CLOSE);
     Bind(wxEVT_THREAD, &WVApp::OnNewWebView, this, CMD_NEW_WEB_VIEW);
     Bind(wxEVT_THREAD, &WVApp::OnDelWebView, this, CMD_DEL_WEB_VIEW);
   }
@@ -270,7 +294,7 @@ namespace {
 #endif // wxUSE_WEBVIEW_IE
 
   std::mutex WVThreadMutex;
-  std::unique_ptr<std::thread> WVThread;
+  std::thread *WVThread = nullptr;
 
   bool WVInitDone = false;
   std::mutex WVInitMutex;
@@ -320,7 +344,7 @@ namespace wv { namespace web_view_detail {
       std::unique_lock<std::mutex> tul(WVThreadMutex);
       if (!WVThread) {
         std::unique_lock<std::mutex> iul(WVInitMutex);
-        WVThread.reset(new std::thread(WVThreadMain));
+        WVThread = new std::thread(WVThreadMain);
         WVInitCV.wait(iul, []{ return WVInitDone; } );
       }
       tul.unlock();
@@ -378,6 +402,18 @@ namespace wv { namespace web_view_detail {
 
       // There maybe some schemes that can't be registered on some systems?
       // It's not clear what the right return type is here.
+    }
+
+    virtual void register_close_handler(CloseHandlerFunc *cfunc) override {
+      RegCloseData *d = new RegCloseData;
+      d->frame = frame;
+      d->cfunc = cfunc;
+
+      wxThreadEvent *event =
+        new wxThreadEvent(wxEVT_THREAD, CMD_REGISTER_CLOSE);
+      event->SetPayload(d);
+
+      wxQueueEvent(wxApp::GetInstance(), event);
     }
 
     WVFrame *frame;

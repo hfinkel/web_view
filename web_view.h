@@ -23,8 +23,20 @@ namespace wv {
   };
 #endif
 
+#if __cpp_concepts >= 201507
+  template <typename T>
+  concept
+#if __cpp_concepts == 201507
+  bool
+#endif
+  CloseHandler = requires(T handler) {
+    { handler() };
+  };
+#endif
+
   namespace web_view_detail {
     using HandlerFunc = std::function<bool(const std::string &, std::ostream &)>;
+    using CloseHandlerFunc = std::function<void()>;
 
     struct impl {
       virtual ~impl() { }
@@ -32,6 +44,7 @@ namespace wv {
       virtual std::future<std::error_code> display_from_uri(const std::string &uri) = 0;
       virtual void register_uri_scheme_handler(const std::string &scheme,
                                                HandlerFunc *func) = 0;
+      virtual void register_close_handler(CloseHandlerFunc *func) = 0;
     };
 
     impl *make_web_view_impl(const std::string &title);
@@ -47,6 +60,11 @@ namespace wv {
     template <typename URISchemeHandler>
     void set_uri_scheme_handler(const std::string &scheme, URISchemeHandler handler) {
       m->register_uri_scheme_handler(scheme, new web_view_detail::HandlerFunc(handler));
+    }
+
+    template <typename CloseHandler>
+    void set_close_handler(CloseHandler handler) {
+      m->register_close_handler(new web_view_detail::CloseHandlerFunc(handler));
     }
 
   private:
