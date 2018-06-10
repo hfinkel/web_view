@@ -32,8 +32,8 @@ else()
 set(LIB_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/lib)
 endif()
 
-add_executable(test test/test.cpp)
-target_link_libraries(test web_view_wx)
+add_executable(test1 tests/test1.cpp)
+target_link_libraries(test1 web_view_wx)
 
 install(TARGETS web_view_wx DESTINATION ${LIB_INSTALL_DIR})
 install(FILES
