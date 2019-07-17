@@ -38,16 +38,11 @@
 #include <web_view.h>
 #include <vector>
 #include <string>
-#include <thread>
 #include <chrono>
 using namespace std::chrono_literals;
 
 int main(int argc, char *argv[]) {
   std::vector<std::string> args(argv, argv + argc);
-
-  std::mutex m;
-  std::condition_variable cv;
-  bool done = false;
 
   wv::web_view w("web_view test app");
   w.set_uri_scheme_handler("wv", [&](const std::string &uri, std::ostream &os) {
@@ -63,16 +58,13 @@ int main(int argc, char *argv[]) {
     return true;
   });
   w.set_close_handler([&]() {
-    std::unique_lock<std::mutex> ul(m);
-    done = true;
-    ul.unlock();
-    cv.notify_one(); });
+    std::cout << "close handler called\n";
+  });
 
   auto f = w.display_from_uri("wv://first.html");
   std::cout << "initial display complete: " << f.get() << "\n";
 
-  std::unique_lock<std::mutex> ul(m);
-  while (!cv.wait_for(ul, 2000ms, [&] { return done; })) {
+  while (!w.wait_for_close(2000ms)) {
     auto r = w.run_script("var node = document.createElement('li');"
                           "node.appendChild(document.createTextNode('Time has passed'));"
                           "document.getElementById('dl').appendChild(node); "

@@ -66,6 +66,7 @@ namespace {
   static const int CMD_RUN_SCRIPT = wxNewId();
   static const int CMD_REGISTER_SCHEME = wxNewId();
   static const int CMD_REGISTER_CLOSE = wxNewId();
+  static const int CMD_REGISTER_AUX_CLOSE = wxNewId();
   static const int CMD_NEW_WEB_VIEW = wxNewId();
   static const int CMD_DEL_WEB_VIEW = wxNewId();
 
@@ -162,9 +163,16 @@ namespace {
       cfunc.reset(f);
     }
 
+    void RegisterAuxClose(CloseHandlerFunc *f) {
+      acfunc.reset(f);
+    }
+
     void OnClose(wxCloseEvent &event) {
       if (cfunc)
         (*cfunc)();
+
+      if (acfunc)
+        (*acfunc)();
     }
 
     wxDECLARE_EVENT_TABLE();
@@ -173,7 +181,7 @@ namespace {
     wxString base_label;
 
     std::unique_ptr<std::promise<std::error_code>> prom;
-    std::unique_ptr<CloseHandlerFunc> cfunc;
+    std::unique_ptr<CloseHandlerFunc> cfunc, acfunc;
   };
 
   wxBEGIN_EVENT_TABLE(WVFrame, wxFrame)
@@ -261,6 +269,12 @@ namespace {
       delete d;
     }
 
+    void OnRegisterAuxClose(wxThreadEvent& event) {
+      RegCloseData *d = event.GetPayload<RegCloseData *>();
+      d->frame->RegisterAuxClose(d->cfunc);
+      delete d;
+    }
+
     void OnNewWebView(wxThreadEvent& event) {
       NewWVData *d = event.GetPayload<NewWVData *>();
 
@@ -293,6 +307,7 @@ namespace {
     Bind(wxEVT_THREAD, &WVApp::OnRunScript, this, CMD_RUN_SCRIPT);
     Bind(wxEVT_THREAD, &WVApp::OnRegisterScheme, this, CMD_REGISTER_SCHEME);
     Bind(wxEVT_THREAD, &WVApp::OnRegisterClose, this, CMD_REGISTER_CLOSE);
+    Bind(wxEVT_THREAD, &WVApp::OnRegisterAuxClose, this, CMD_REGISTER_AUX_CLOSE);
     Bind(wxEVT_THREAD, &WVApp::OnNewWebView, this, CMD_NEW_WEB_VIEW);
     Bind(wxEVT_THREAD, &WVApp::OnDelWebView, this, CMD_DEL_WEB_VIEW);
   }
@@ -483,6 +498,18 @@ namespace wv { namespace web_view_detail {
 
       wxThreadEvent *event =
         new wxThreadEvent(wxEVT_THREAD, CMD_REGISTER_CLOSE);
+      event->SetPayload(d);
+
+      wxQueueEvent(wxApp::GetInstance(), event);
+    }
+
+    virtual void register_aux_close_handler(CloseHandlerFunc *cfunc) override {
+      RegCloseData *d = new RegCloseData;
+      d->frame = frame;
+      d->cfunc = cfunc;
+
+      wxThreadEvent *event =
+        new wxThreadEvent(wxEVT_THREAD, CMD_REGISTER_AUX_CLOSE);
       event->SetPayload(d);
 
       wxQueueEvent(wxApp::GetInstance(), event);

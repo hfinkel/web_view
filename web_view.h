@@ -45,6 +45,8 @@
 #include <iostream>
 #include <future>
 #include <system_error>
+#include <chrono>
+#include <thread>
 
 namespace wv {    
 #if __cpp_concepts >= 201507
@@ -81,6 +83,8 @@ namespace wv {
       virtual void register_uri_scheme_handler(const std::string &scheme,
                                                HandlerFunc *func) = 0;
       virtual void register_close_handler(CloseHandlerFunc *func) = 0;
+
+      virtual void register_aux_close_handler(CloseHandlerFunc *func) = 0;
     };
 
     impl *make_web_view_impl(const std::string &title);
@@ -107,8 +111,44 @@ namespace wv {
       m->register_close_handler(new web_view_detail::CloseHandlerFunc(handler));
     }
 
+    template <typename Rep, typename Period>
+    bool wait_for_close(const std::chrono::duration<Rep, Period>& rel_time) {
+      std::mutex m;
+      std::condition_variable cv;
+      bool done = false;
+
+      set_aux_close_handler([&]() {
+        std::unique_lock<std::mutex> ul(m);
+        done = true;
+        ul.unlock();
+        cv.notify_one(); });
+
+      std::unique_lock<std::mutex> ul(m);
+      return cv.wait_for(ul, rel_time, [&] { return done; });
+    }
+
+    void wait_for_close() {
+      std::mutex m;
+      std::condition_variable cv;
+      bool done = false;
+
+      set_aux_close_handler([&]() {
+        std::unique_lock<std::mutex> ul(m);
+        done = true;
+        ul.unlock();
+        cv.notify_one(); });
+
+      std::unique_lock<std::mutex> ul(m);
+      cv.wait(ul, [&] { return done; });
+    }
+
   private:
     std::unique_ptr<web_view_detail::impl> m;
+
+    template <typename CloseHandler>
+    void set_aux_close_handler(CloseHandler handler) {
+      m->register_aux_close_handler(new web_view_detail::CloseHandlerFunc(handler));
+    }
   };
 }
 
