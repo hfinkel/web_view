@@ -39,6 +39,7 @@
 #include <vector>
 #include <string>
 #include <chrono>
+#include <format>
 using namespace std::chrono_literals;
 
 int main(int argc, char *argv[]) {
@@ -47,11 +48,13 @@ int main(int argc, char *argv[]) {
   wv::web_view w("web_view test app");
   w.set_uri_scheme_handler("wv", [&](const std::string &uri, std::ostream &os) {
     std::cout << "request: " << uri << "\n";
-    os << "<html><head><title>" << uri << "</title></head><body><p>" << uri << "</p><table>";
+
+    os << std::format("<html><head><title>{0}</title></head><body><p>{0}</p><table>\n", uri);
+
     for (auto &a : args)
-      os << "<tr><td>" << a << "</td></tr>" << "\n"; // we need some kind of "to_html" utility function.
+      os << std::format("<tr><td>{}</td></tr>\n", a); // we need some kind of "to_html" utility function.
     os << "</table>";
-    os << "<p><a href=\"" << uri << "/more.html" << "\">more</a></p>";
+    os << std::format("<p><a href=\"{}/more.html\">more</a></p>", uri);
     os << "<ul id='dl'></ul>";
     os << "</body></html>";
 
