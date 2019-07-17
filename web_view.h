@@ -91,7 +91,16 @@ namespace wv {
   }
 
   struct web_view {
-    web_view(const std::string &title = "") : m(web_view_detail::make_web_view_impl(title)) { }
+    web_view(const std::string &title = "") :
+      m(web_view_detail::make_web_view_impl(title)), done(false) {
+
+      set_aux_close_handler([&]() {
+        std::unique_lock<std::mutex> ul(done_m);
+        done = true;
+        ul.unlock();
+        done_cv.notify_one();
+      });
+    }
 
     std::future<std::error_code> display_from_uri(const std::string &uri) {
       return m->display_from_uri(uri);
@@ -113,37 +122,21 @@ namespace wv {
 
     template <typename Rep, typename Period>
     bool wait_for_close(const std::chrono::duration<Rep, Period>& rel_time) {
-      std::mutex m;
-      std::condition_variable cv;
-      bool done = false;
-
-      set_aux_close_handler([&]() {
-        std::unique_lock<std::mutex> ul(m);
-        done = true;
-        ul.unlock();
-        cv.notify_one(); });
-
-      std::unique_lock<std::mutex> ul(m);
-      return cv.wait_for(ul, rel_time, [&] { return done; });
+      std::unique_lock<std::mutex> ul(done_m);
+      return done_cv.wait_for(ul, rel_time, [&] { return done; });
     }
 
     void wait_for_close() {
-      std::mutex m;
-      std::condition_variable cv;
-      bool done = false;
-
-      set_aux_close_handler([&]() {
-        std::unique_lock<std::mutex> ul(m);
-        done = true;
-        ul.unlock();
-        cv.notify_one(); });
-
-      std::unique_lock<std::mutex> ul(m);
-      cv.wait(ul, [&] { return done; });
+      std::unique_lock<std::mutex> ul(done_m);
+      done_cv.wait(ul, [&] { return done; });
     }
 
   private:
     std::unique_ptr<web_view_detail::impl> m;
+
+    std::mutex done_m;
+    std::condition_variable done_cv;
+    bool done;
 
     template <typename CloseHandler>
     void set_aux_close_handler(CloseHandler handler) {
