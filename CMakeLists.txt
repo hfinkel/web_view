@@ -74,6 +74,9 @@ endif()
 add_executable(test1 tests/test1.cpp)
 target_link_libraries(test1 web_view_wx)
 
+add_executable(test2 tests/test2.cpp)
+target_link_libraries(test2 web_view_wx)
+
 install(TARGETS web_view_wx DESTINATION ${LIB_INSTALL_DIR})
 install(FILES
   web_view.h

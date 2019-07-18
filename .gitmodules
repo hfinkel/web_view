@@ -2,3 +2,9 @@
 	path = fmt
 	url = https://github.com/fmtlib/fmt.git
 	branch = std
+[submodule "tests/sg"]
+	path = tests/sg
+	url = https://github.com/6pac/SlickGrid.git
+[submodule "tests/uikit"]
+	path = tests/uikit
+	url = https://github.com/uikit/uikit

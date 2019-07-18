@@ -85,6 +85,8 @@ namespace wv {
       virtual void register_close_handler(CloseHandlerFunc *func) = 0;
 
       virtual void register_aux_close_handler(CloseHandlerFunc *func) = 0;
+
+      virtual void request_close() = 0;
     };
 
     impl *make_web_view_impl(const std::string &title);
@@ -129,6 +131,10 @@ namespace wv {
     void wait_for_close() {
       std::unique_lock<std::mutex> ul(done_m);
       done_cv.wait(ul, [&] { return done; });
+    }
+
+    void request_close() {
+      m->request_close();
     }
 
   private:

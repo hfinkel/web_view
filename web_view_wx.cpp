@@ -515,6 +515,10 @@ namespace wv { namespace web_view_detail {
       wxQueueEvent(wxApp::GetInstance(), event);
     }
 
+    virtual void request_close() override {
+      frame->Close();
+    };
+
     WVFrame *frame;
   };
 
