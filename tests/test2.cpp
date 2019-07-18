@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
   std::cout << "initial display complete: " << f.get() << "\n";
 
   int i = 1;
-  while (!w.wait_for_close(400ms)) {
+  while (!w.wait_for_close(i == 1 ? 2000ms : 400ms)) {
     if (++i > 1024*1024)
       continue;
 
