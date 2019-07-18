@@ -80,6 +80,10 @@ namespace {
       if (!(*func)(uri.ToStdString(), os))
         return nullptr;
 
+      // There is an assert that will triger for a zero-byte return. Work around this for now.
+      if (os.str().empty())
+        os << " ";
+
       return new wxFSFile(new wxStringInputStream(os.str()), uri, "", "", wxDateTime::Now());
     }
 

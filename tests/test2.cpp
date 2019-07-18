@@ -53,7 +53,6 @@ int main(int argc, char *argv[]) {
   wv::web_view w("web_view test app");
   w.set_uri_scheme_handler("wv", [&](const std::string &uri, std::ostream &os) {
     std::cout << "request: " << uri << "\n";
-    os << "closing...\n";
     w.request_close();
     return true;
   });
